@@ -16,10 +16,10 @@ This version must **never** be deployed to production.
 - Endpoint: `POST /products`
 - Code: `ProductsController.cs` — `Create(...)`
 
-**Description**
+**Description**  
 The API accepts the `id` field directly from client input. The server does not enforce ownership of identifier generation.
 
-**How to exploit**
+**How to exploit**  
 An attacker can submit a custom `id` value in the request body, which is stored without validation or override.
 
 **Impact**
@@ -47,10 +47,10 @@ Content-Type: application/json
 - Endpoint: `POST /products`
 - Code: `ProductsController.cs` — `Create(...)`
 
-**Description**
+**Description**  
 The API does not apply any server-side validation to product input fields such as `name` or `price`.
 
-**How to exploit**
+**How to exploit**  
 An attacker can submit logically invalid values, including negative prices or empty product names.
 
 **Impact**
@@ -86,10 +86,10 @@ Expected result:
 - Endpoint: `GET /products/{id}`
 - Code: `ProductsController.cs` — `GetById(...)`
 
-**Description**
+**Description**  
 The endpoint does not safely handle requests for non-existing resources.
 
-**How to exploit**
+**How to exploit**  
 Requesting a product ID that does not exist triggers an unhandled exception.
 
 **Impact**

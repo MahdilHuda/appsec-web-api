@@ -2,9 +2,8 @@
 {
     public class Product
     {
-        int Id { get; set; }
-        string Name { get; set; }
-        decimal Price { get; set; }
-
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public decimal Price { get; set; }
     }
 }

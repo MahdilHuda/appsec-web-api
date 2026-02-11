@@ -19,9 +19,16 @@ namespace AppSec_Web_API.Controllers
         [HttpPost]
         public IActionResult Create(Product product)
         {
-            product.Id = _products.Count + 1;
             _products.Add(product);
             return CreatedAtAction(nameof(GetAll), product);
         }
+
+        [HttpGet("{id}")]
+        public IActionResult GetById(int id)
+        {
+            var product = _products.First(p => p.Id == id); // kaster exception hvis ikke fundet
+            return Ok(product);
+        }
+
     }
 }

@@ -12,9 +12,9 @@ Business Logic Flaws (accepting negative price values).
 **Business Impact:**
 - **Direct Financial loss:** Manipulation of price fields allows transactions below cost or negative totals.
 - **Data Corruption:** Unauthorized modification of server-controlled identifiers leads to inconsistent states across internal databases and ERP systems.
-- **Downstream Failure:** Broken synchronization with logistics and inventory systems due to corrupted product IDs.
+- **Downstream Failure:** Broken synchronization with logistics and inventory systems due to corrupted product IDs.  
 
-
+  
 ### Service Availability  
 *Description:*  
 The resilience of the API against resource exhaustion and its ability to handle anomalous input without service interruption.
@@ -54,7 +54,61 @@ Specifically addresses unhandled exceptions and the resulting stack traces or ge
 **Business Impact:**
 - **Increased MTTD/MTTR:** Poorly handled exceptions (crashes without logs) hide the root cause, delaying detection and recovery during an incident.
 - **Information Disclosure:** Verbose error messages or stack traces reveal internal file paths, framework versions, or database schemas to potential attackers.
-- **Monitoring Blind Spots:** Failure to log failed validation attempts prevents the SOC (Security Operations Center) from identifying active probing or automated attacks.
+- **Monitoring Blind Spots:** Failure to log failed validation attempts prevents the SOC (Security Operations Center) from identifying active probing or automated attacks.  
+  
+## Trust Boundaries
+```
+┌──────────────────────────────────┐
+│         Untrusted Client         │
+│    (Postman / Browser / Script)  │
+└────────────────┬─────────────────┘
+                 │
+                 │ HTTP + JSON
+                 ▼
+┌──────────────────────────────────┐
+│       ASP.NET Core Web API       │
+│   (Controllers + Model Binding)  │
+└────────────────┬─────────────────┘
+                 │
+                 │ In-process call
+                 ▼
+┌──────────────────────────────────┐
+│     In-Memory Product Store      │
+│  (List<Product> / Static Coll.)  │
+└──────────────────────────────────┘
+```
+> * **TB1: Client → API:** This represents the HTTP boundary where untrusted user input enters the trusted execution environment. It's the primary point for validation and sanitization.
+> * **TB2: API → Data Store:** An in-process boundary representing a trusted internal call. The system must remain cautious as data could already be "poisoned" if TB1 checks were insufficient.
+> * **TB3 (Future): API → Database:** This will represent the External Service boundary, where data leaves the local process to interact with a persistent database or third-party API, introducing new requirements for network security and serialization.  
+  
+### Boundary Failure Mapping
 
+| Vulnerability | Where boundary fails | What is trusted incorrectly | Asset impacted |
+| :--- | :--- | :--- | :--- |
+| **Mass assignment** | **TB1** (Model Binding) | DTO shape allows client-provided fields that the server should exclusively control. | Product Data Integrity / API Trust |
+| **Missing validation** | **TB1** (Controller/Handler) | Controller/handler accepts Name or Price without guard clauses or validation attributes. | Product Data Integrity / API Trust |
+| **Unhandled exception** | **TB1** (Request Pipeline) | Route param lookup fails due to missing "Not Found" handling or unmanaged indexing errors. | Availability / Error Hygiene |
+  
+### Attack Surface
+**POST /products** - Unauthenticated JSON ingestion  
+  
+*Input Channels:*  
+Request Body (JSON) and Headers.  
+  
+*Attack Vector:*  
+- *Over-posting:* Client sends a manually defined Id to break server authority over identity.
+- *Data poisoning:* Client sends `price = -1` or `name = ""` to inject invalid business states.
+  
+**GET /products/{id}** — Parameter-driven lookup  
+  
+*Input Channels:*  
+Route parameter {id}.
+  
+*Attack Vector:*  
+- *Non-existent/Out-of-range ID:* Attacker sends IDs that don't exist or are extreme values to trigger crashes (500 errors).
+- *Type Mismatch:* Sending non-numeric strings to test binder robustness and error leakage.
 
-
+### Exploit Chain Analysis
+An attacker uses Over-posting to control the Id and injects a negative price via POST /products, poisoning the In-Memory Store.  
+When a legitimate consumer or downstream system fetches this product, it causes incorrect total calculations and financial loss.  
+Simultaneously, the attacker spams GET requests with non-existing IDs, triggering 500 Internal Server Errors that mask the poisoning attack with monitoring noise and cause service instability.

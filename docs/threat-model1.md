@@ -54,8 +54,9 @@ Specifically addresses unhandled exceptions and the resulting stack traces or ge
 **Business Impact:**
 - **Increased MTTD/MTTR:** Poorly handled exceptions (crashes without logs) hide the root cause, delaying detection and recovery during an incident.
 - **Information Disclosure:** Verbose error messages or stack traces reveal internal file paths, framework versions, or database schemas to potential attackers.
-- **Monitoring Blind Spots:** Failure to log failed validation attempts prevents the SOC (Security Operations Center) from identifying active probing or automated attacks.  
-  
+- **Monitoring Blind Spots:** Failure to log failed validation attempts prevents the SOC (Security Operations Center) from identifying active probing or automated attacks.
+
+
 ## Trust Boundaries
 ```
 ┌──────────────────────────────────┐
@@ -88,7 +89,7 @@ Specifically addresses unhandled exceptions and the resulting stack traces or ge
 | **Mass assignment** | **TB1** (Model Binding) | DTO shape allows client-provided fields that the server should exclusively control. | Product Data Integrity / API Trust |
 | **Missing validation** | **TB1** (Controller/Handler) | Controller/handler accepts Name or Price without guard clauses or validation attributes. | Product Data Integrity / API Trust |
 | **Unhandled exception** | **TB1** (Request Pipeline) | Route param lookup fails due to missing "Not Found" handling or unmanaged indexing errors. | Availability / Error Hygiene |
-  
+
 ### Attack Surface
 **POST /products** - Unauthenticated JSON ingestion  
   
@@ -109,6 +110,22 @@ Route parameter {id}.
 - *Type Mismatch:* Sending non-numeric strings to test binder robustness and error leakage.
 
 ### Exploit Chain Analysis
-An attacker uses Over-posting to control the Id and injects a negative price via POST /products, poisoning the In-Memory Store.  
+An attacker uses over-posting to control the Id and injects a negative price via POST /products, poisoning the in-memory store.  
 When a legitimate consumer or downstream system fetches this product, it causes incorrect total calculations and financial loss.  
 Simultaneously, the attacker spams GET requests with non-existing IDs, triggering 500 Internal Server Errors that mask the poisoning attack with monitoring noise and cause service instability.
+
+
+## STRIDE Threat Classification
+
+| Vulnerability | STRIDE | Justification | Realistic Impact | Threat Actor Profile |
+| :--- | :--- | :--- | :--- | :--- |
+| **Mass Assignment** | **Tampering** | Trust boundary enforcement fails. Client controls server-authoritative fields during model binding. | Unauthorized state mutation. Attacker overwrites existing records or bypasses identity logic. | **Low-skill Attacker:** Uses manual JSON manipulation to probe for hidden fields. |
+| **Missing Validation** | **Tampering** | Domain invariants are not enforced at boundary crossing. Invalid state transitions are accepted into the trusted store. | Data poisoning. Negative prices or empty strings break downstream accounting/calculation systems. | **Opportunistic attacker/Automated Bot:** Systematically testing boundary conditions. |
+| **Unhandled Exception** | **Information Disclosure / Denial of Service** | Unhandled exceptions at boundary crossing propagate through the request pipeline without controlled error handling. Info disclosure is conditional if detailed errors/stack traces are enabled. | Service instability (DoS) or leakage of internal code paths and framework versions to the client. | **Low-skill Attacker:** Performing boundary-case probing. |  
+
+### Key learnings
+- HTTP is a hard trust boundary: client input must be treated as untrusted, and the server must remain authoritative over identifiers and state.
+- Missing validation is not just “bad data” — it’s tampering against domain invariants that can cause real business impact (e.g., financial loss, corrupted downstream calculations).
+- Unhandled exceptions are security-relevant: they can destabilize availability and, if error details are misconfigured, disclose internal implementation signals that aid attackers.
+
+

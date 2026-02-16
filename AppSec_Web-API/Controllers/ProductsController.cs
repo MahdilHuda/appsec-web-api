@@ -52,9 +52,16 @@ namespace AppSec_Web_API.Controllers
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
-            var product = _products.First(p => p.Id == id); // kaster exception hvis ikke fundet
+            var product = _products.FirstOrDefault(p => p.Id == id);
+
+            if (product is null)
+            {
+                return NotFound();
+            }
+
             return Ok(product);
         }
+
 
     }
 }

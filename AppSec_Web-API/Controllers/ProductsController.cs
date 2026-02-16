@@ -10,7 +10,7 @@ namespace AppSec_Web_API.Controllers
     public class ProductsController : ControllerBase
     {
         private static readonly List<Product> _products = new();
-        private static int _nextId = 1;
+        private static int _nextId = 0;
 
         [HttpGet]
         public IActionResult GetAll()
@@ -21,7 +21,23 @@ namespace AppSec_Web_API.Controllers
         [HttpPost]
         public IActionResult Create(CreateProductRequest request)
         {
-            var id = _nextId++;
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                ModelState.AddModelError("name", "Name is required.");
+            }
+
+            if (request.Price <= 0)
+            {
+                ModelState.AddModelError("price", "Price must be greater than zero.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var id = Interlocked.Increment(ref _nextId);
+
             var product = new Product
             {
                 Id = id,
@@ -30,7 +46,7 @@ namespace AppSec_Web_API.Controllers
             };
 
             _products.Add(product);
-            return CreatedAtAction(nameof(GetAll), product);
+            return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
         }
 
         [HttpGet("{id}")]
